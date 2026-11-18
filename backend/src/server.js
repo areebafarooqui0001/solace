@@ -217,12 +217,13 @@ app.post('/conversations/:id/messages', auth, aiLimit, async (req, res) => {
     .run(conv.id, 'assistant', out.reply, out.mood, out.suggestion ? JSON.stringify(out.suggestion) : null);
 
   if (isFirst) {
-    const title = await ai.makeTitle(text);
+    // Never put a crisis message in the conversation list as a title.
+    const title = out.crisis ? 'A hard moment' : await ai.makeTitle(text);
     db.prepare('UPDATE conversations SET title = ? WHERE id = ?').run(title, conv.id);
   }
   db.prepare("UPDATE conversations SET updated_at = datetime('now') WHERE id = ?").run(conv.id);
 
-  ai.extractMemories(user, text, out.reply); // fire and forget
+  if (!out.crisis) ai.extractMemories(user, text, out.reply); // fire and forget
 
   res.json({
     message: { id: info.lastInsertRowid, role: 'assistant', content: out.reply, mood: out.mood, suggestion: out.suggestion },

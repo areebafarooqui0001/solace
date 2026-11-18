@@ -4,6 +4,9 @@ node_modules/
 *.db-wal
 *.db-shm
 .expo/
+.claude/
 dist/
 android/
 ios/
+*.log
+.DS_Store

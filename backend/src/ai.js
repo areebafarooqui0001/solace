@@ -3,6 +3,18 @@ const db = require('./db');
 
 const ACTIVITIES = ['breathing', 'affirmation', 'reflection', 'gratitude', 'walk', 'water', 'stretch', 'grounding'];
 
+// Safety first: a message that signals self-harm is answered by the server itself, before any model is called.
+const CRISIS_RE = /(suicid|kill myself|killing myself|end my life|take my own life|want to die|wanna die|don'?t want to (live|be here)|no reason to live|better off dead|self[- ]?harm|hurt myself|harm myself|cut myself)/i;
+
+function crisisReply(user) {
+  return {
+    reply: `${user.name}, I'm really glad you told me, and I'm taking it seriously. You don't have to carry this alone. Please reach out to someone you trust right now, or call Tele-MANAS at 14416 (free, 24x7). If you are in danger, call 112 (in the US, call or text 988). I'm here with you too.`,
+    mood: 'sad',
+    suggestion: null,
+    crisis: true,
+  };
+}
+
 function systemPrompt(user, memories, recentMoods, checks = []) {
   const memBlock = memories.length
     ? memories.map((m) => `- ${m.fact}`).join('\n')
@@ -43,6 +55,7 @@ function parseJson(text) {
 }
 
 async function chat(user, history, userText) {
+  if (CRISIS_RE.test(userText)) return crisisReply(user);
   const memories = user.memory_enabled
     ? db.prepare('SELECT fact FROM memories WHERE user_id = ? ORDER BY id DESC LIMIT 25').all(user.id)
     : [];
@@ -80,13 +93,7 @@ async function chat(user, history, userText) {
 function offlineReply(user, text) {
   const lower = text.toLowerCase();
   // Even when the AI is unavailable (or a provider blocks the message), never answer self-harm with a generic line.
-  if (/(suicid|kill myself|end my life|want to die|don'?t want to live|self[- ]?harm|hurt myself)/.test(lower)) {
-    return {
-      reply: `${user.name}, I'm really glad you told me, and I'm taking it seriously. You don't have to carry this alone. Please reach out to someone you trust right now, or call Tele-MANAS at 14416 (free, 24x7). If you are in danger, call 112. I'm here with you too.`,
-      mood: 'sad',
-      suggestion: null,
-    };
-  }
+  if (CRISIS_RE.test(text)) return crisisReply(user);
   const anxious = /(anxious|worried|panic|stress|nervous|overwhelm)/.test(lower);
   return {
     reply: anxious

@@ -43,6 +43,7 @@ const GEMINI_MODELS = {
   fast: list(process.env.GEMINI_FAST_MODEL, ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash-lite']),
 };
 const working = {}; // role -> model name that last succeeded
+const cooling = {}; // model -> time until which we skip it after a rate-limit or overload error
 
 async function geminiRequest(model, { system, messages, maxTokens, json }) {
   const is25 = model.includes('2.5');
@@ -74,10 +75,21 @@ async function geminiRequest(model, { system, messages, maxTokens, json }) {
 
 async function callGemini({ system, messages, maxTokens, fast, json }) {
   const role = fast ? 'fast' : 'chat';
-  const candidates = [working[role], ...GEMINI_MODELS[role]].filter((m, i, a) => m && a.indexOf(m) === i);
+  const all = [working[role], ...GEMINI_MODELS[role]].filter((m, i, a) => m && a.indexOf(m) === i);
+  // Skip models that just ran out of quota, unless that would leave nothing to try.
+  const ready = all.filter((m) => !(cooling[m] > Date.now()));
+  const candidates = ready.length ? ready : all;
   let lastErr;
   for (const model of candidates) {
     const res = await geminiRequest(model, { system, messages, maxTokens, json });
+    if (res.status === 429 || res.status === 503) {
+      // Out of quota (each model has its own) or temporarily overloaded: rest this model and try the next one.
+      cooling[model] = Date.now() + (res.status === 429 ? 5 * 60000 : 30000);
+      lastErr = new Error(`Gemini ${res.status} for ${model}: ${(await res.text()).slice(0, 160)}`);
+      if (working[role] === model) delete working[role];
+      console.warn(`Gemini ${model} is rate-limited or busy, trying another model`);
+      continue;
+    }
     if (res.status === 404 || res.status === 403) {
       lastErr = new Error(`Gemini ${res.status} for ${model}: ${(await res.text()).slice(0, 160)}`);
       if (working[role] === model) delete working[role];

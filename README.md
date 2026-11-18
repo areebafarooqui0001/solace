@@ -1,87 +1,120 @@
-# Solace AI
+# Solace
 
-Expo (React Native) app in `app/`, Node/Express + SQLite (Node built-in `node:sqlite`, no native build) API in `backend/`. Gemini (free tier) or Claude powers the companion "Sunny". Needs Node 22.13+ (or 24.3+).
+**An AI wellness companion that remembers you and guides your day.**
+Built for the Solace AI hackathon (2026). A React Native app, a Node.js API and an AI layer designed around one idea: *a calm place to land, one small thing at a time.*
 
-## 1. Run the backend
+> Screenshots: add images to `docs/` and link them here.
 
-```bash
-cd backend
-cp .env.example .env      # Windows: copy .env.example .env
-npm install
-npm start                 # http://localhost:4000
+## What it does
+
+| Area | Details |
+| --- | --- |
+| **Sunny, the AI companion** | Warm, specific replies; understands mood (the mascot's face changes); remembers what matters; suggests a real in-app activity when it helps |
+| **Memory you control** | View, delete, clear or switch off everything Sunny remembers. With memory off, no history is used |
+| **Daily note** | Written by AI each morning from your mood, goals and memories, with a personal affirmation and one suggested activity |
+| **Small daily challenge** | One tiny, kind task chosen for how you feel; +XP, once a day |
+| **Check-ins** | One-tap mood check-in, plus three gentle screenings (mood, anxiety, self-love), one question per screen, never a diagnosis |
+| **Breathing and resources** | Guided breathing, five guides with tappable steps, therapists near you (location or city), crisis helplines |
+| **Progress** | XP, levels, streaks, a 7-day mood chart and badges |
+| **Reminders** | Local notifications with a time picker; work when the app is closed and open the right screen when tapped |
+| **Privacy** | Account and data deletion, memory controls, no AI key in the app |
+| **Auth** | Email accounts (bcrypt + JWT); optional Google sign-in (Android) |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  A[React Native app<br/>Expo, TypeScript] -- HTTPS / JSON --> B[Express API<br/>Node 22]
+  B --> C[(SQLite<br/>node:sqlite)]
+  B -- server side only --> D[Gemini API]
+  A -. local notifications .-> A
+  B -- verifies ID token --> E[Google tokeninfo]
 ```
 
-Open `.env` and set:
+- **App:** Expo Router (file-based routes), Reanimated for motion, expo-notifications for reminders, expo-secure-store for the session, expo-location for therapists.
+- **API:** Express, JWT auth, an in-memory rate limiter, and a wrapper that forwards async errors to a single error handler. SQLite uses Node's built-in `node:sqlite`, so there is nothing native to compile.
+- **AI keys never ship in the app.** The app only talks to the API.
 
-- `AI_PROVIDER=gemini` and `GEMINI_API_KEY=` your free key from https://aistudio.google.com (Get API key), or
-- `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY=` your Claude key (paid)
-- `JWT_SECRET=` any long random string
+## The AI layer (what sits on top of the model)
 
-Check http://localhost:4000/health. It should say `"ai":true` and the provider name. If it says `false`, the key is missing or has a typo.
+1. **Persona and style rules**: a system prompt defines Sunny's voice (specific, short, at most one question, no clichés).
+2. **Personal context** (only with consent): name, goals, last 7 mood check-ins, recent screening results and saved memories are added to every request.
+3. **Long-term memory**: after a chat, a second small call extracts up to two durable facts, skipping sensitive details such as diagnoses.
+4. **Structured output**: the model returns JSON `{reply, mood, suggestion}`. The server only accepts suggestions from a fixed list of eight in-app activities, so the AI cannot invent features.
+5. **Beyond chat**: the same pipeline writes the daily note and affirmation and picks the daily challenge, each cached per day with a rule-based fallback if the AI is unavailable.
+6. **Safety**: messages that signal self-harm are answered by the server **before any model call** with Tele-MANAS (14416) and 112, never saved as a memory or a title. The prompt also forbids diagnosis.
+7. **Resilience**: models are tried in order, skipping retired (404) or rate-limited (429/503) ones, and the working model is remembered.
 
-Free-tier note: Google may use free-tier prompts to improve its products, so test with made-up feelings, not real personal ones. Switching to a paid key later is only an `.env` change.
+## Run it locally
 
-## 2. Run the app on your phone (fastest way to test)
+Requirements: Node 22.13+, an Expo-compatible phone or emulator, optionally a free Gemini key from Google AI Studio.
 
 ```bash
-cd app
-cp .env.example .env      # Windows: copy .env.example .env
-# edit .env: set EXPO_PUBLIC_API_URL to http://<your computer's IP>:4000
+# 1. API
+cd backend
+cp .env.example .env        # set GEMINI_API_KEY and JWT_SECRET
+npm install
+npm start                   # http://localhost:4000/health
+
+# 2. App
+cd ../app
+cp .env.example .env        # set EXPO_PUBLIC_API_URL (your computer's LAN IP, or a deployed URL)
 npm install
 npx expo start
 ```
 
-Phone and computer on the same Wi-Fi. Open Expo Go and scan the QR code. Local reminders work in Expo Go; for the final notification test use the APK.
+Without a Gemini key the API still runs, with simple rule-based replies, which is useful for development.
 
-## 3. Deploy the backend (needed for the APK)
-
-The database is a SQLite file. Host it somewhere with a **persistent volume** and set `DB_PATH=/data/solace.db`.
-Free tiers with an ephemeral disk wipe users and chats when the instance restarts.
-Set env vars: `AI_PROVIDER`, `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`), `JWT_SECRET`, `DB_PATH`.
-
-## 4. Build the APK
+## Tests
 
 ```bash
-cd app
-# put your deployed URL in eas.json -> build.preview.env.EXPO_PUBLIC_API_URL
-npx eas-cli@latest login
-npx eas-cli@latest build:configure
-npx eas-cli@latest build --platform android --profile preview
+cd backend && npm test      # 21 end-to-end API tests on a temporary database
+cd app && npx tsc --noEmit  # type-check
 ```
 
-EAS prints a download link for the `.apk` when the build finishes.
+The backend tests start the real server and cover accounts, XP and streak rules, the daily challenge, chat history and ownership, memory controls, account deletion, Google sign-in (against a fake Google), rate limiting, startup checks and AI safety (a crisis message never reaches the model; invented activities are dropped). GitHub Actions runs them on every push.
 
-## What is in the app
+## Deploy
 
-- Splash, onboarding, signup with goals, login
-- Home: self-love level + XP + streak, daily affirmation, daily check-in, quick start (Sunny, Check-in, Breathe, Resources)
-- Sunny: Claude-powered companion that reads your mood, remembers what matters (viewable, editable, switch-off-able), suggests activities inline, keeps chat history
-- Check-ins: mood, anxiety and self-love screenings (gentle snapshots, never diagnoses) that earn XP and also inform Sunny
-- Breathing: 4 in, 4 hold, 6 out, 4 cycles. Circle grows on the inhale, shrinks on the exhale, seconds count down, pause/resume
-- Resources: five tap-each-step guides, therapists-near-you search, crisis help (Tele-MANAS 14416 and 112 for India, 988 for US)
-- Reminders: daily local notifications that work when the app is closed, tap to open the right screen
-- XP rules are enforced on the server (once a day per activity, breathing up to 3x) so they cannot be farmed
+**Backend** (Render, free): root directory `backend`, build `npm install`, start `npm start`, Node 22. Set `GEMINI_API_KEY`, `JWT_SECRET` and optionally `DEMO_EMAIL` / `DEMO_PASSWORD`. The server refuses to start on a host with the example JWT secret.
 
-## Demo script (2-3 min)
+On a free plan the database is wiped when the service sleeps or redeploys. A demo account is recreated at every start, and an uptime monitor pinging `/health` keeps the service awake. For permanent data use a paid instance with a disk and set `DB_PATH=/data/solace.db`.
 
-1. Splash, onboarding, sign up with goals.
-2. Home: level, XP bar, streak, affirmation. Tap a mood, watch the +25 XP toast.
-3. Tell Sunny about a rough day. Show it suggesting breathing inline, then follow it.
-4. Breathing: Start, circle grows on inhale and shrinks while "Breathe out" counts down, finish for XP.
-5. Check-ins: take the anxiety check, show the result and the three wellness moves, then back in chat show Sunny is gentler.
-6. Resources: tap steps in a guide, open the help sheet.
-7. Start a second chat that references something from the first, then You > What Sunny remembers.
-8. Set a reminder two minutes ahead, close the app, tap the notification.
-9. Chat history: reopen, swipe to delete.
-
-## Daily experience (latest additions)
-- **Sunny's note**: an AI-written message each day from your mood, goals and (if memory is on) what Sunny remembers, with a personal affirmation and one suggested activity. Cached per day, rewritten after a new check-in, and falls back to a gentle fixed note if the AI is unavailable.
-- **Today's small challenge**: one tiny, kind task picked for the day (AI, or a curated pool offline). Tick it for +15 XP, once a day.
-- **Reminder time picker** and **two-question signup** (how you've been feeling, preferred check-in time).
-- **Therapists near you**, branded app icon, adaptive/monochrome Android icons and native splash screen.
+**App** (Android APK via EAS): put your API URL in `app/eas.json`, then `npx eas-cli build --platform android --profile preview`.
 
 ## Google sign-in (optional)
-Off by default and hidden in Expo Go. Turns on in a real build when `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` (eas.json) is set and the backend has `GOOGLE_CLIENT_IDS` with the same ID. New Google users get a one-time "about you" screen; existing emails sign in to the same account.
 
-## Free hosting note
-On Render's free plan the database is wiped whenever the service sleeps or redeploys. Set `DEMO_EMAIL` and `DEMO_PASSWORD` on the server and a lived-in demo account is recreated at every start. A free uptime monitor pinging `/health` every 5 minutes keeps the service awake. For permanent data use a paid instance with a persistent disk and set `DB_PATH`.
+Off by default and hidden in Expo Go. To enable it:
+
+1. Read your keystore SHA-1: `npx eas-cli credentials --platform android`.
+2. In Google Cloud Console create an **Android** OAuth client for package `com.solace.wellness` with that SHA-1, and under Advanced settings tick **Enable custom URI scheme**. Publish the consent screen.
+3. Set `GOOGLE_CLIENT_IDS` on the server and `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` in the EAS build env, then rebuild.
+
+The server verifies the ID token with Google (audience, issuer, verified email) before creating or signing in an account.
+
+## API overview
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/auth/signup`, `/auth/login`, `/auth/google`, `/auth/check-email` | Accounts |
+| DELETE | `/auth/account` | Delete account and all data |
+| POST | `/me/setup` | Goals, how you feel, check-in time |
+| GET / POST | `/conversations`, `/conversations/:id/messages` | Chat history and messages |
+| GET / DELETE | `/memories` | View and delete what Sunny remembers |
+| POST | `/moods`, `/assessments`, `/activities` | Check-ins and activities (award XP) |
+| GET | `/daily/note`, `/daily/challenge` | Personalised daily content |
+| GET | `/progress` | Level, streak, chart, badges |
+| GET / POST / PATCH / DELETE | `/reminders`, `/reminders/:id` | Reminder settings |
+
+## Known limits and next steps
+
+- SQLite on one instance is right for a prototype; the next step is Postgres and a migration tool.
+- Replies arrive whole rather than streamed.
+- Reminders are local notifications, not push; server-driven push is a next step.
+- Google sign-in is Android only; Apple sign-in is not implemented.
+- No vector search or fine-tuning: memory is a short list of facts, by design.
+- Not a medical product. Screenings are friendly check-ins, not diagnoses.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

@@ -3,11 +3,10 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 import { useRouter } from 'expo-router';
 import { Mascot } from '../components/Mascot';
 import { Button, Chip, Field, Screen } from '../components/ui';
-import { TimeSheet, fmtTime } from '../components/TimeSheet';
+import { FeelingPick, GoalsPick, ReminderPick, StepDots } from '../components/SetupSteps';
 import { useAuth } from '../auth';
 import { ensurePermission, syncReminders } from '../lib/notifications';
 import { api } from '../api';
-import { FEELINGS, GOALS } from '../content';
 import { GoogleButton, OrDivider } from '../components/GoogleButton';
 import { colors, fonts } from '../theme';
 
@@ -21,9 +20,7 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [goals, setGoals] = useState<string[]>([]);
   const [feeling, setFeeling] = useState('');
-  const [remind, setRemind] = useState(true);
-  const [time, setTime] = useState({ hour: 20, minute: 0 });
-  const [picking, setPicking] = useState(false);
+  const [reminder, setReminder] = useState({ remind: true, time: { hour: 20, minute: 0 } });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,13 +44,16 @@ export default function Signup() {
     }
   };
 
-  const toggle = (g: string) => setGoals((c) => (c.includes(g) ? c.filter((x) => x !== g) : [...c, g]));
+  const go = (n: number) => {
+    setError('');
+    setStep(n);
+  };
 
   const create = async () => {
     setError('');
     setBusy(true);
     try {
-      await signUp({ name, email, password, goals, feeling: feeling || undefined, remind, checkinTime: time });
+      await signUp({ name, email, password, goals, feeling: feeling || undefined, remind: reminder.remind, checkinTime: reminder.time });
       // Ask for notification permission at a moment that makes sense, and schedule the default reminders.
       try {
         await ensurePermission();
@@ -76,8 +76,9 @@ export default function Signup() {
       <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="handled">
           <View style={{ alignItems: 'center', marginBottom: 8 }}>
-            <Mascot mood={step === 0 ? 'calm' : 'joyful'} size={110} />
+            <Mascot mood={step === 0 ? 'calm' : 'joyful'} size={step === 0 ? 110 : 90} />
           </View>
+          <StepDots total={4} index={step} />
           {step === 0 ? (
             <>
               <Text style={styles.title}>Let's get to know you</Text>
@@ -101,43 +102,28 @@ export default function Signup() {
             </>
           ) : step === 1 ? (
             <>
-              <Text style={styles.title}>Nice to meet you, {name.trim().split(' ')[0]}</Text>
-              <Text style={styles.sub}>What would you like Solace to help with? Pick any.</Text>
-              <View style={styles.chips}>
-                {GOALS.map((g) => (
-                  <Chip key={g} label={g} selected={goals.includes(g)} onPress={() => toggle(g)} />
-                ))}
-              </View>
-              <Button title="Continue" onPress={() => { setError(''); setStep(2); }} style={{ marginTop: 28 }} />
-              <Text style={styles.switch} onPress={() => { setError(''); setStep(0); }}>
+              <GoalsPick value={goals} onChange={setGoals} title={`Nice to meet you, ${name.trim().split(' ')[0]}`} />
+              <Button title="Next" onPress={() => go(2)} style={{ marginTop: 28 }} />
+              <Text style={styles.switch} onPress={() => go(0)}>
+                Back
+              </Text>
+            </>
+          ) : step === 2 ? (
+            <>
+              <FeelingPick value={feeling} onChange={setFeeling} />
+              <Button title="Next" onPress={() => go(3)} style={{ marginTop: 28 }} />
+              <Text style={styles.switch} onPress={() => go(1)}>
                 Back
               </Text>
             </>
           ) : (
             <>
-              <Text style={styles.title}>Two last things</Text>
-              <Text style={styles.sub}>So Sunny can meet you where you are.</Text>
-              <Text style={styles.q}>How have you been feeling lately?</Text>
-              <View style={styles.chips}>
-                {FEELINGS.map((f) => (
-                  <Chip key={f} label={f} selected={feeling === f} onPress={() => setFeeling(feeling === f ? '' : f)} />
-                ))}
-              </View>
-              <Text style={[styles.q, { marginTop: 26 }]}>When should Sunny nudge you to check in?</Text>
-              <View style={styles.chips}>
-                {[{ l: 'Morning', h: 8 }, { l: 'Afternoon', h: 14 }, { l: 'Evening', h: 20 }].map((o) => (
-                  <Chip key={o.l} label={`${o.l} · ${fmtTime(o.h, 0)}`} selected={remind && time.hour === o.h && time.minute === 0} onPress={() => { setRemind(true); setTime({ hour: o.h, minute: 0 }); }} />
-                ))}
-                <Chip label={remind ? `Custom · ${fmtTime(time.hour, time.minute)}` : 'Custom time'} selected={remind && ![8, 14, 20].includes(time.hour) || remind && time.minute !== 0} onPress={() => { setRemind(true); setPicking(true); }} />
-                <Chip label="No reminders" selected={!remind} onPress={() => setRemind(false)} />
-              </View>
-              <Text style={styles.hint}>You can change this anytime in your profile.</Text>
-              {!!error && <Text style={styles.error}>{error}</Text>}
-              <Button title="Create my space" onPress={create} loading={busy} style={{ marginTop: 24 }} />
-              <Text style={styles.switch} onPress={() => { setError(''); setStep(1); }}>
+              <ReminderPick value={reminder} onChange={setReminder} />
+              {!!error && <Text style={[styles.error, { marginTop: 14 }]}>{error}</Text>}
+              <Button title="Create my space" onPress={create} loading={busy} style={{ marginTop: 28 }} />
+              <Text style={styles.switch} onPress={() => go(2)}>
                 Back
               </Text>
-              <TimeSheet visible={picking} title="Check-in time" hour={time.hour} minute={time.minute} onClose={() => setPicking(false)} onSave={(hour, minute) => { setTime({ hour, minute }); setPicking(false); }} />
             </>
           )}
         </ScrollView>
