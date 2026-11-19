@@ -18,7 +18,7 @@ Built for the Solace AI hackathon (2026). A React Native app, a Node.js API and 
 | **Progress** | XP, levels, streaks, a 7-day mood chart and badges |
 | **Reminders** | Local notifications with a time picker; work when the app is closed and open the right screen when tapped |
 | **Privacy** | Account and data deletion, memory controls, no AI key in the app |
-| **Auth** | Email accounts (bcrypt + JWT); optional Google sign-in (Android) |
+| **Auth** | Email accounts (bcrypt + JWT) and Google sign-in on Android, verified server-side |
 
 ## Architecture
 
@@ -82,15 +82,19 @@ On a free plan the database is wiped when the service sleeps or redeploys. A dem
 
 **App** (Android APK via EAS): put your API URL in `app/eas.json`, then `npx eas-cli build --platform android --profile preview`.
 
-## Google sign-in (optional)
+## Google sign-in (Android)
 
-Off by default and hidden in Expo Go. To enable it:
+Works on a real device. It is hidden in Expo Go and in builds without a client ID, so email login never depends on it.
+
+**How it works:** the app opens Google's account chooser (authorization code flow with PKCE) and exchanges the code for an ID token. The server then verifies that token with Google (audience, issuer, verified email) before it creates or signs in an account. New Google users get a short three-step "about you" setup.
+
+**Status:** the Google Cloud project is in *Testing* mode, so only accounts added as test users can sign in. To open it to everyone, publish the OAuth consent screen, which needs a public home page and privacy policy URL (GitHub Pages works).
+
+**Set it up for your own build**
 
 1. Read your keystore SHA-1: `npx eas-cli credentials --platform android`.
-2. In Google Cloud Console create an **Android** OAuth client for package `com.solace.wellness` with that SHA-1, and under Advanced settings tick **Enable custom URI scheme**. Publish the consent screen.
-3. Set `GOOGLE_CLIENT_IDS` on the server and `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` in the EAS build env, then rebuild.
-
-The server verifies the ID token with Google (audience, issuer, verified email) before creating or signing in an account.
+2. In Google Cloud Console create an **Android** OAuth client for package `com.solace.wellness` with that SHA-1, and under Advanced settings tick **Enable custom URI scheme** (it can take a while to apply).
+3. Set `GOOGLE_CLIENT_IDS` on the server and `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` in the EAS build env (`app/eas.json`), then rebuild.
 
 ## API overview
 
@@ -111,7 +115,7 @@ The server verifies the ID token with Google (audience, issuer, verified email) 
 - SQLite on one instance is right for a prototype; the next step is Postgres and a migration tool.
 - Replies arrive whole rather than streamed.
 - Reminders are local notifications, not push; server-driven push is a next step.
-- Google sign-in is Android only; Apple sign-in is not implemented.
+- Google sign-in is Android only and in Google's Testing mode; Apple sign-in is not implemented.
 - No vector search or fine-tuning: memory is a short list of facts, by design.
 - Not a medical product. Screenings are friendly check-ins, not diagnoses.
 
