@@ -1,21 +1,18 @@
 {
-  "cli": {
-    "version": ">= 12.0.0",
-    "appVersionSource": "local"
-  },
+  "cli": { "version": ">= 12.0.0", "appVersionSource": "local" },
   "build": {
     "preview": {
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      },
+      "android": { "buildType": "apk" },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://solace-u3q8.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://solace-u3q8.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "998281902551-sshcr85nljb81q79u00skq6oc29n72j0.apps.googleusercontent.com"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://solace-u3q8.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://solace-u3q8.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "998281902551-sshcr85nljb81q79u00skq6oc29n72j0.apps.googleusercontent.com"
       }
     }
   }
