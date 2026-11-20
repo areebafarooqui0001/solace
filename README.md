@@ -3,7 +3,12 @@
 **An AI wellness companion that remembers you and guides your day.**
 Built for the Solace AI hackathon (2026). A React Native app, a Node.js API and an AI layer designed around one idea: *a calm place to land, one small thing at a time.*
 
-> Screenshots: add images to `docs/` and link them here.
+<p align="center">
+  <img src="docs/home.png" width="190" alt="Home" />
+  <img src="docs/chat.png" width="190" alt="Chat with Sunny" />
+  <img src="docs/checkin.png" width="190" alt="Check-in" />
+  <img src="docs/progress.png" width="190" alt="Progress" />
+</p>
 
 ## What it does
 
