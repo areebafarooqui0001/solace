@@ -93,7 +93,7 @@ Works on a real device. It is hidden in Expo Go and in builds without a client I
 
 **How it works:** the app opens Google's account chooser (authorization code flow with PKCE) and exchanges the code for an ID token. The server then verifies that token with Google (audience, issuer, verified email) before it creates or signs in an account. New Google users get a short three-step "about you" setup.
 
-**Status:** the Google Cloud project is in *Testing* mode, so only accounts added as test users can sign in. To open it to everyone, publish the OAuth consent screen, which needs a public home page and privacy policy URL (GitHub Pages works).
+**Status:** the Google Cloud project is published and asks only for basic sign-in (name and email). Google's optional branding verification has not been done, which affects only how the consent screen looks, and unverified apps are capped at 100 users.
 
 **Set it up for your own build**
 
@@ -120,7 +120,7 @@ Works on a real device. It is hidden in Expo Go and in builds without a client I
 - SQLite on one instance is right for a prototype; the next step is Postgres and a migration tool.
 - Replies arrive whole rather than streamed.
 - Reminders are local notifications, not push; server-driven push is a next step.
-- Google sign-in is Android only and in Google's Testing mode; Apple sign-in is not implemented.
+- Google sign-in is Android only and its branding is not verified by Google; Apple sign-in is not implemented.
 - No vector search or fine-tuning: memory is a short list of facts, by design.
 - Not a medical product. Screenings are friendly check-ins, not diagnoses.
 
