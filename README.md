@@ -1,7 +1,7 @@
 # Solace
 
 **An AI wellness companion that remembers you and guides your day.**
-Built for the Solace AI hackathon (2026). A React Native app, a Node.js API and an AI layer designed around one idea: *a calm place to land, one small thing at a time.*
+A React Native app, a Node.js API and an AI layer designed around one idea: *a calm place to land, one small thing at a time.*
 
 <p align="center">
   <img src="docs/home.png" width="190" alt="Home" />
